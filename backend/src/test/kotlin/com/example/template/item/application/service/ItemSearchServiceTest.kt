@@ -1,6 +1,8 @@
 package com.example.template.item.application.service
 
 import com.example.template.item.application.port.`in`.ListItemsQuery
+import com.example.template.item.application.port.`in`.SearchItemsQuery
+import com.example.template.item.application.port.out.ItemPageResult
 import com.example.template.item.application.port.out.ListItemsPort
 import com.example.template.item.application.port.out.SearchItemsPort
 import com.example.template.item.domain.Item
@@ -17,7 +19,24 @@ class ItemSearchServiceTest {
             .take(limit)
             .map { Item.restore(it, "item-$it", null, NOW) }
     }
-    private val service = ItemSearchService(SearchItemsPort { error("검색은 이 테스트에서 쓰지 않는다") }, store)
+    // 받은 인자를 기록하고 고정된 결과를 돌려준다
+    private val searchCalls = mutableListOf<String>()
+    private val searchPort = SearchItemsPort { keyword, offset, limit ->
+        searchCalls += "$keyword/$offset/$limit"
+        ItemPageResult(listOf(Item.restore(1L, "노트북", null, NOW)), 7)
+    }
+    private val service = ItemSearchService(searchPort, store)
+
+    @Test
+    fun searchConvertsPageToOffsetAndKeepsPageInfo() {
+        val result = service.search(SearchItemsQuery("  노트 ", 2, 3))
+
+        assertThat(searchCalls).containsExactly("노트/6/3")
+        assertThat(result.items.map { it.name }).containsExactly("노트북")
+        assertThat(result.totalCount).isEqualTo(7)
+        assertThat(result.page).isEqualTo(2)
+        assertThat(result.size).isEqualTo(3)
+    }
 
     @Test
     fun firstPageReturnsNewestAndNextCursor() {

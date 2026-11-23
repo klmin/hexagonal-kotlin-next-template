@@ -66,6 +66,7 @@ class HexagonalArchitectureTest {
             .that().resideInAPackage("..domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
                 "org.springframework..", "jakarta.persistence..", "jakarta.validation..", "org.jooq..",
+                "io.swagger..", "tools.jackson..", "com.fasterxml.jackson..",
             )
 
         @ArchTest
@@ -80,6 +81,7 @@ class HexagonalArchitectureTest {
             .that().resideInAPackage("..application..")
             .should().dependOnClassesThat().resideInAnyPackage(
                 "org.springframework.web..", "org.springframework.data..", "jakarta.persistence..", "org.jooq..",
+                "jakarta.validation..", "io.swagger..", "tools.jackson..", "com.fasterxml.jackson..",
             )
 
         // 인증 정보(SecurityContextHolder, Authentication, Jwt 등)는 adapter.in 에서 꺼내 Command 에 사용자 id 로 넘긴다.
@@ -102,6 +104,15 @@ class HexagonalArchitectureTest {
         val outboundAdaptersDoNotUseInbound: ArchRule = noClasses()
             .that().resideInAPackage("..adapter.out..")
             .should().dependOnClassesThat().resideInAPackage("..adapter.in..")
+
+        // 출력 포트와 그 구현은 유스케이스 API(port.in 의 Command/Query/Result)를 모른다.
+        // API 모양이 바뀌어도 DB 어댑터가 따라 바뀌지 않게 출력 포트 전용 타입(예: ItemPageResult)을 쓴다
+        @ArchTest
+        @JvmField
+        val outboundSideDoesNotUseInputPorts: ArchRule = noClasses()
+            .that().resideInAnyPackage("..application.port.out..", "..adapter.out..")
+            .should().dependOnClassesThat().resideInAPackage("..application.port.in..")
+            .because("출력 포트는 저장소가 알아야 할 값만 받는다")
 
         @ArchTest
         @JvmField

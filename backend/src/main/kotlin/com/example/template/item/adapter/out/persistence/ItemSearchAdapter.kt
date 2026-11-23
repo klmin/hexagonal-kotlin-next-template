@@ -2,8 +2,7 @@ package com.example.template.item.adapter.out.persistence
 
 import com.example.template.common.jooq.tables.records.ItemsRecord
 import com.example.template.common.jooq.tables.references.ITEMS
-import com.example.template.item.application.port.`in`.ItemSearchResult
-import com.example.template.item.application.port.`in`.SearchItemsQuery
+import com.example.template.item.application.port.out.ItemPageResult
 import com.example.template.item.application.port.out.ListItemsPort
 import com.example.template.item.application.port.out.SearchItemsPort
 import com.example.template.item.domain.Item
@@ -27,17 +26,17 @@ internal class ItemSearchAdapter(
             .fetch { it.toDomain() }
     }
 
-    override fun search(query: SearchItemsQuery): ItemSearchResult {
+    override fun search(keyword: String?, offset: Long, limit: Int): ItemPageResult {
         // let: keyword 가 null 이 아닐 때만 조건을 만든다
-        val condition = query.keyword?.let { ITEMS.NAME.containsIgnoreCase(it) } ?: noCondition()
+        val condition = keyword?.let { ITEMS.NAME.containsIgnoreCase(it) } ?: noCondition()
         val items = dsl.selectFrom(ITEMS)
             .where(condition)
             .orderBy(ITEMS.ID.desc())
-            .limit(query.size)
-            .offset(query.page.toLong() * query.size)
+            .limit(limit)
+            .offset(offset)
             .fetch { it.toDomain() }
         val total = dsl.fetchCount(ITEMS, condition).toLong()
-        return ItemSearchResult(items, total, query.page, query.size)
+        return ItemPageResult(items, total)
     }
 
     // name, createdAt 은 NOT NULL 컬럼이라 생성 코드에서도 non-null. id 는 DB 가 채우는 값이라 nullable 로 생성된다
