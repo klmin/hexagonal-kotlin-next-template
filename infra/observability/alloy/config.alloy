@@ -1,0 +1,104 @@
+// 수집 파이프라인. 상태 확인: http://localhost:12345
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// ---------- 출구 ----------
+
+prometheus.remote_write "default" {
+  endpoint {
+    url            = "http://prometheus:9090/api/v1/write"
+    send_exemplars = true
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// ---------- 메트릭: 앱의 /actuator/prometheus 를 가져감 ----------
+
+prometheus.scrape "app" {
+  targets = [{
+    "__address__" = sys.env("APP_METRICS_TARGET"),
+    "env"         = sys.env("APP_ENV"),
+  }]
+  job_name        = sys.env("APP_NAME")
+  metrics_path    = "/actuator/prometheus"
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.default.receiver]
+}
+
+// ---------- 트레이스: 앱이 OTLP로 보냄 ----------
+// 로컬은 전부 저장한다. 운영에서 양이 많으면 batch 앞에 otelcol.processor.tail_sampling 을 넣는다.
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// ---------- 로그: 앱이 남긴 JSON 로그 파일을 읽음 (LOG_FILE) ----------
+
+local.file_match "app" {
+  path_targets = [{
+    "__path__"     = "/var/log/app/*.log",
+    "service_name" = sys.env("APP_NAME"),
+    "env"          = sys.env("APP_ENV"),
+  }]
+  sync_period = "10s"
+}
+
+loki.source.file "app" {
+  targets    = local.file_match.app.targets
+  forward_to = [loki.process.app.receiver]
+}
+
+loki.process "app" {
+  stage.json {
+    expressions = {
+      level    = "level",
+      trace_id = "traceId",
+      span_id  = "spanId",
+    }
+  }
+
+  stage.labels {
+    values = { level = "" }
+  }
+
+  // trace_id는 값 종류가 많아서 라벨이 아니라 structured metadata로 둔다
+  stage.structured_metadata {
+    values = {
+      trace_id = "",
+      span_id  = "",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
