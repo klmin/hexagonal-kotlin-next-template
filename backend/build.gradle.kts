@@ -15,8 +15,12 @@ version = "0.0.1-SNAPSHOT"
 kotlin {
     jvmToolchain(25)
     compilerOptions {
-        // Spring/JSpecify 의 @Nullable 정보를 코틀린 타입(String?)으로 엄격하게 반영한다
+        // Spring 7 은 JSpecify(@Nullable)를 쓰고 코틀린 2.x 는 이를 기본으로 엄격하게 반영한다.
+        // -Xjsr305=strict 는 아직 JSR-305(javax.annotation) 를 쓰는 라이브러리까지 같은 방식으로 맞춘다.
+        // (코틀린 2.4 부터 생성자 프로퍼티의 어노테이션은 기본으로 파라미터와 필드 모두에 붙는다. docs/kotlin-vs-java.md 3번)
         freeCompilerArgs.addAll("-Xjsr305=strict")
+        // 경고를 오류로. 지금 경고가 0개라 비용이 없고, null 관련 경고가 쌓이지 않게 막는다
+        allWarningsAsErrors = true
         // 파라미터 이름을 바이트코드에 남긴다. 검증 오류의 field("size")와 @RequestParam 이름 추론에 필요
         javaParameters = true
     }
