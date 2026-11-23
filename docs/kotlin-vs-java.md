@@ -112,7 +112,10 @@ ArchUnit은 바이트코드를 보므로 규칙은 그대로 동작한다. 다�
 
 - `@ArchTest` 필드는 static이어야 해서 `companion object` 안에 `@JvmField`로 둔다
 - `companion object`는 `ListItemsQuery$Companion` 같은 중첩 클래스가 된다. "port 안의 클래스는 인터페이스" 규칙에 걸리지 않게 `areTopLevelClasses()`를 추가했다
-- `internal`은 바이트코드에서 public이라, package-private처럼 "어댑터 밖에서 엔티티를 못 쓰게" 컴파일러가 막아 주지는 않는다(같은 모듈 안에서는 보인다). 엔티티를 밖으로 내보내지 않는 규칙은 리뷰와 ArchUnit(`adapter.out` 은 다른 계층에서 참조 금지)으로 지킨다
+- `internal`은 바이트코드에서 public이라, package-private처럼 "어댑터 밖에서 엔티티를 못 쓰게" 컴파일러가 막아 주지는 않는다(같은 모듈 안에서는 보인다).
+  그래서 자바 버전의 `notBePublic()` 규칙은 코틀린에서 모든 클래스를 통과시킨다. `outboundAdaptersAreInternal`은 바이트코드 대신
+  `kotlin-reflect`로 코틀린 메타데이터의 가시성(`KVisibility.INTERNAL`)을 읽어서 검사한다. 최상위 함수만 담은 `XxxKt` 파일 클래스는 건너뛴다
+- `@Transactional` 위치, `Instant.now()` 금지 규칙은 바이트코드의 어노테이션, 메서드 호출을 보므로 자바 버전 그대로 동작한다
 
 ### 11. MockK 는 기본이 엄격하다
 
