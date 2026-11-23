@@ -144,6 +144,13 @@ Spring `@Transactional`은 기본으로 RuntimeException/Error에서만 롤백�
 
 `build.gradle.kts`의 `allWarningsAsErrors = true`로 컴파일 경고가 있으면 빌드가 실패한다. 플랫폼 타입, 불필요한 `!!` 같은 null 관련 경고가 쌓이지 않게 한다.
 
+### 15. 포맷과 린트 (ktlint)
+
+자바 버전에는 백엔드 포맷 검사가 없지만, 코틀린 버전은 Spotless + ktlint를 `./gradlew build`에 넣었다. 어긋나면 빌드가 실패하고 `./gradlew spotlessApply`로 고친다.
+
+- 스타일은 `intellij_idea` (루트 `.editorconfig`). 기본값 `ktlint_official`은 파라미터 두 개짜리 함수도 여러 줄로 나눠서 IntelliJ의 Reformat Code와 계속 부딪힌다
+- `package-name` 규칙은 껐다. 백틱 패키지(`` port.`in` ``)를 허용하지 않기 때문이다 (1번)
+
 ## 직접 해 보기
 
 1. `Item`에 규칙을 하나 추가해 보기 (예: 이름에 금지어). 도메인 테스트부터 쓴다

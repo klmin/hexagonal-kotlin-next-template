@@ -34,7 +34,8 @@ com.example.template
 ```bash
 ./gradlew bootRun       # compose.yaml의 PostgreSQL 자동 기동 (Docker 필요)
 ./gradlew bootTestRun   # Testcontainers로 DB 띄워서 실행
-./gradlew build         # 테스트 + ArchUnit 포함
+./gradlew build         # 테스트 + ArchUnit + ktlint 포맷 검사
+./gradlew spotlessApply # ktlint 포맷 자동 수정 (규칙은 루트 .editorconfig)
 ```
 
 빌드에는 Docker가 필요하다. jOOQ 코드를 만들 때 임시 PostgreSQL 컨테이너를 쓰기 때문이다([JPA와 jOOQ](#jpa와-jooq)).
