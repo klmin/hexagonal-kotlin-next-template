@@ -20,7 +20,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.MonthDay
 import java.time.OffsetDateTime
+import java.time.OffsetTime
+import java.time.Year
+import java.time.YearMonth
 import java.time.ZonedDateTime
 import kotlin.reflect.KVisibility
 
@@ -43,8 +47,12 @@ class HexagonalArchitectureTest {
         private const val JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional"
         private val TIME_TYPES = setOf(
             Instant::class.java, LocalDate::class.java, LocalDateTime::class.java, LocalTime::class.java,
-            OffsetDateTime::class.java, ZonedDateTime::class.java,
+            OffsetDateTime::class.java, OffsetTime::class.java, ZonedDateTime::class.java,
+            Year::class.java, YearMonth::class.java, MonthDay::class.java,
         )
+
+        // 코틀린 표준 라이브러리(kotlin.time), kotlinx-datetime 의 Clock.System.now() 도 시스템 시계를 바로 읽는다
+        private val KOTLIN_SYSTEM_CLOCKS = setOf("kotlin.time.Clock\$System", "kotlinx.datetime.Clock\$System")
 
         @ArchTest
         @JvmField
@@ -162,11 +170,13 @@ class HexagonalArchitectureTest {
             .orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL)
             .because("트랜잭션 경계는 application.service 에 둔다")
 
-        // 현재 시각은 Clock Bean 으로 읽는다. Instant.now(clock) 처럼 Clock 을 넘기는 호출은 허용
+        // 현재 시각은 Clock Bean 으로 읽는다. Instant.now(clock) 처럼 Clock 을 넘기는 호출은 허용.
+        // System.currentTimeMillis() 대신 clock.millis(). 경과 시간 측정용 System.nanoTime() 은 허용
         @ArchTest
         @JvmField
         val noSystemTimeNow: ArchRule = noClasses()
             .should().callMethodWhere(systemTimeNow())
+            .orShould().callMethod(System::class.java, "currentTimeMillis")
             .because("현재 시각은 주입받은 Clock 으로 읽어야 테스트에서 고정할 수 있다")
 
         // 시스템 Clock 은 common.config 의 Clock Bean 에서만 만든다
@@ -178,11 +188,11 @@ class HexagonalArchitectureTest {
             .because("Clock 은 Bean 으로 주입받는다")
 
         private fun systemTimeNow() = DescribedPredicate.describe<JavaMethodCall>(
-            "now() without Clock on java.time types",
+            "now() without Clock on java.time types, or Clock.System.now()",
         ) { call ->
-            call.name == "now" &&
-                TIME_TYPES.any { call.targetOwner.isEquivalentTo(it) } &&
+            val javaTimeNow = TIME_TYPES.any { call.targetOwner.isEquivalentTo(it) } &&
                 call.target.rawParameterTypes.map { it.name } != listOf(Clock::class.java.name)
+            call.name == "now" && (javaTimeNow || call.targetOwner.name in KOTLIN_SYSTEM_CLOCKS)
         }
 
         private fun systemClockFactory() = DescribedPredicate.describe<JavaMethodCall>("Clock.system*()") { call ->

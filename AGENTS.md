@@ -56,7 +56,7 @@ common/jooq/                         jOOQ 생성 코드 (빌드 시 생성, 커�
 - Spring Security는 application, domain에서 사용 금지. 인증 정보는 adapter.in에서 꺼내 Command에 사용자 id로 넘긴다
 - adapter.out의 최상위 클래스(JPA 엔티티, 리포지토리, 어댑터)는 `internal`(또는 `private`). 엔티티를 어댑터 밖으로 내보내지 않고 도메인 모델로 변환한다
 - `@Transactional`(클래스, 메서드)은 `application.service`에만
-- 현재 시각은 `Clock` Bean 주입. `Instant.now()`, `LocalDateTime.now()` 같은 직접 호출 금지(`now(clock)`은 허용), `Clock.systemUTC()` 등은 `common.config`에서만
+- 현재 시각은 `Clock` Bean 주입. `Instant.now()`, `LocalDateTime.now()`, `YearMonth.now()` 같은 java.time 타입의 직접 호출, 코틀린 `Clock.System.now()`, `System.currentTimeMillis()` 금지(`now(clock)`, `clock.millis()`는 허용), `Clock.systemUTC()` 등은 `common.config`에서만
 
 그 외:
 
