@@ -65,8 +65,13 @@ class HexagonalArchitectureTest {
         val domainIsFrameworkFree: ArchRule = noClasses()
             .that().resideInAPackage("..domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                "org.springframework..", "jakarta.persistence..", "jakarta.validation..", "org.jooq..",
-                "io.swagger..", "tools.jackson..", "com.fasterxml.jackson..",
+                "org.springframework..",
+                "jakarta.persistence..",
+                "jakarta.validation..",
+                "org.jooq..",
+                "io.swagger..",
+                "tools.jackson..",
+                "com.fasterxml.jackson..",
             )
 
         @ArchTest
@@ -80,8 +85,14 @@ class HexagonalArchitectureTest {
         val applicationDoesNotUseWebOrPersistence: ArchRule = noClasses()
             .that().resideInAPackage("..application..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                "org.springframework.web..", "org.springframework.data..", "jakarta.persistence..", "org.jooq..",
-                "jakarta.validation..", "io.swagger..", "tools.jackson..", "com.fasterxml.jackson..",
+                "org.springframework.web..",
+                "org.springframework.data..",
+                "jakarta.persistence..",
+                "org.jooq..",
+                "jakarta.validation..",
+                "io.swagger..",
+                "tools.jackson..",
+                "com.fasterxml.jackson..",
             )
 
         // 인증 정보(SecurityContextHolder, Authentication, Jwt 등)는 adapter.in 에서 꺼내 Command 에 사용자 id 로 넘긴다.
@@ -212,21 +223,20 @@ class HexagonalArchitectureTest {
 
         // 코틀린 클래스는 kotlin-reflect 로 internal/private 인지 본다. 자바 클래스는 public 여부로 본다.
         // 파일 단위 함수가 모인 ...Kt 클래스(@Metadata kind 2)는 클래스 선언이 아니므로 건너뛴다
-        private fun notBeVisibleOutsideModule() =
-            object : ArchCondition<JavaClass>("be internal or private") {
-                override fun check(item: JavaClass, events: ConditionEvents) {
-                    val type = item.reflect()
-                    val metadata = type.getAnnotation(Metadata::class.java)
-                    val visible = when {
-                        metadata == null -> item.modifiers.contains(JavaModifier.PUBLIC)
-                        metadata.kind != 1 -> return
-                        else -> type.kotlin.visibility.let { it == KVisibility.PUBLIC || it == KVisibility.PROTECTED }
-                    }
-                    if (visible) {
-                        events.add(SimpleConditionEvent.violated(item, "${item.name} is visible outside the module"))
-                    }
+        private fun notBeVisibleOutsideModule() = object : ArchCondition<JavaClass>("be internal or private") {
+            override fun check(item: JavaClass, events: ConditionEvents) {
+                val type = item.reflect()
+                val metadata = type.getAnnotation(Metadata::class.java)
+                val visible = when {
+                    metadata == null -> item.modifiers.contains(JavaModifier.PUBLIC)
+                    metadata.kind != 1 -> return
+                    else -> type.kotlin.visibility.let { it == KVisibility.PUBLIC || it == KVisibility.PROTECTED }
+                }
+                if (visible) {
+                    events.add(SimpleConditionEvent.violated(item, "${item.name} is visible outside the module"))
                 }
             }
+        }
 
         private fun featureOf(javaClass: JavaClass): String? {
             val feature = FEATURE.matchEntire(javaClass.name)?.groupValues?.get(1)
@@ -242,19 +252,18 @@ class HexagonalArchitectureTest {
             }
         }
 
-        private fun onlyUseOtherFeaturesThroughInputPorts() =
-            object : ArchCondition<JavaClass>("only use other features through application.port.in or domain") {
-                override fun check(item: JavaClass, events: ConditionEvents) {
-                    val from = featureOf(item) ?: return
-                    for (d in item.directDependenciesFromSelf) {
-                        val to = featureOf(d.targetClass)
-                        if (to == null || to == from) continue
-                        val pkg = d.targetClass.packageName
-                        if (!pkg.contains(".application.port.in") && !pkg.contains(".domain")) {
-                            events.add(SimpleConditionEvent.violated(d, d.description))
-                        }
+        private fun onlyUseOtherFeaturesThroughInputPorts() = object : ArchCondition<JavaClass>("only use other features through application.port.in or domain") {
+            override fun check(item: JavaClass, events: ConditionEvents) {
+                val from = featureOf(item) ?: return
+                for (d in item.directDependenciesFromSelf) {
+                    val to = featureOf(d.targetClass)
+                    if (to == null || to == from) continue
+                    val pkg = d.targetClass.packageName
+                    if (!pkg.contains(".application.port.in") && !pkg.contains(".domain")) {
+                        events.add(SimpleConditionEvent.violated(d, d.description))
                     }
                 }
             }
+        }
     }
 }

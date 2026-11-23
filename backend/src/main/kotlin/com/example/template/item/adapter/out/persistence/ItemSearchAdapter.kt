@@ -14,7 +14,8 @@ import org.springframework.stereotype.Component
 @Component
 internal class ItemSearchAdapter(
     private val dsl: DSLContext,
-) : SearchItemsPort, ListItemsPort {
+) : SearchItemsPort,
+    ListItemsPort {
 
     // 커서(키셋) 페이징: OFFSET 없이 PK 인덱스로 바로 찾아가서 뒤 페이지도 빠르다
     override fun findBefore(beforeId: Long?, limit: Int): List<Item> {

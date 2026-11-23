@@ -16,7 +16,8 @@ import org.springframework.transaction.annotation.Transactional
 class ItemSearchService(
     private val searchItemsPort: SearchItemsPort,
     private val listItemsPort: ListItemsPort,
-) : SearchItemsUseCase, ListItemsUseCase {
+) : SearchItemsUseCase,
+    ListItemsUseCase {
 
     // size + 1 개를 읽어서 다음 페이지가 있는지 판단한다 (count 쿼리 없음)
     override fun list(query: ListItemsQuery): ItemListResult {

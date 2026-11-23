@@ -21,7 +21,6 @@ data class SearchItemsQuery private constructor(val keyword: String?, val page: 
     }
 
     companion object {
-        operator fun invoke(keyword: String?, page: Int, size: Int) =
-            SearchItemsQuery(keyword?.trim()?.ifEmpty { null }, page, size)
+        operator fun invoke(keyword: String?, page: Int, size: Int) = SearchItemsQuery(keyword?.trim()?.ifEmpty { null }, page, size)
     }
 }

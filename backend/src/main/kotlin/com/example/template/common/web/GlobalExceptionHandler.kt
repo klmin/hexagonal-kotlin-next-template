@@ -22,12 +22,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     @ExceptionHandler(DomainValidationException::class)
-    fun handleDomainValidation(ex: DomainValidationException): ProblemDetail =
-        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.message)
+    fun handleDomainValidation(ex: DomainValidationException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.message)
 
     @ExceptionHandler(NotFoundException::class)
-    fun handleNotFound(ex: NotFoundException): ProblemDetail =
-        ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.message)
+    fun handleNotFound(ex: NotFoundException): ProblemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.message)
 
     // 처리하지 못한 예외도 Problem Details 로 응답한다. 내부 메시지는 응답에 넣지 않고 로그로만 남긴다
     @ExceptionHandler(Exception::class)
@@ -66,13 +64,12 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     // 확장 함수: ParameterValidationResult 에 메서드를 추가한 것처럼 쓴다. 이 파일 안에서만 보인다(private)
-    private fun ParameterValidationResult.toFieldErrors(): List<FieldError> =
-        if (this is ParameterErrors) {
-            fieldErrors.map { FieldError(it.field, it.defaultMessage) }
-        } else {
-            val name = methodParameter.parameterName
-            resolvableErrors.map { FieldError(name, it.defaultMessage) }
-        }
+    private fun ParameterValidationResult.toFieldErrors(): List<FieldError> = if (this is ParameterErrors) {
+        fieldErrors.map { FieldError(it.field, it.defaultMessage) }
+    } else {
+        val name = methodParameter.parameterName
+        resolvableErrors.map { FieldError(name, it.defaultMessage) }
+    }
 
     data class FieldError(val field: String?, val message: String?)
 

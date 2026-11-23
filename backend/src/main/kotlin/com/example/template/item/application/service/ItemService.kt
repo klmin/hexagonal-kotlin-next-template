@@ -27,7 +27,10 @@ class ItemService(
     private val updateItemPort: UpdateItemPort,
     private val deleteItemPort: DeleteItemPort,
     private val clock: Clock,
-) : CreateItemUseCase, GetItemUseCase, UpdateItemUseCase, DeleteItemUseCase {
+) : CreateItemUseCase,
+    GetItemUseCase,
+    UpdateItemUseCase,
+    DeleteItemUseCase {
 
     @Transactional
     override fun create(command: CreateItemCommand): Item {
