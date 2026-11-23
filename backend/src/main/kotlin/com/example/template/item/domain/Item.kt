@@ -31,12 +31,10 @@ class Item private constructor(
         const val NAME_MAX_LENGTH = 100
         const val DESCRIPTION_MAX_LENGTH = 500
 
-        fun create(name: String, description: String?, createdAt: Instant) =
-            Item(null, name, description, createdAt)
+        fun create(name: String, description: String?, createdAt: Instant) = Item(null, name, description, createdAt)
 
         // id 가 Long(non-null) 타입이라 null 을 넘기는 코드는 컴파일되지 않는다 (자바는 런타임에 requireNonNull)
-        fun restore(id: Long, name: String, description: String?, createdAt: Instant) =
-            Item(id, name, description, createdAt)
+        fun restore(id: Long, name: String, description: String?, createdAt: Instant) = Item(id, name, description, createdAt)
 
         private fun validateName(name: String): String {
             if (name.isBlank()) {

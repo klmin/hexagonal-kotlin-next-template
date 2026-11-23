@@ -51,8 +51,7 @@ class ItemController(
     fun get(@PathVariable id: Long): ItemResponse = ItemResponse.from(getItemUseCase.getItem(id))
 
     @PutMapping("/{id}")
-    fun update(@PathVariable id: Long, @Valid @RequestBody request: UpdateItemRequest): ItemResponse =
-        ItemResponse.from(updateItemUseCase.update(request.toCommand(id)))
+    fun update(@PathVariable id: Long, @Valid @RequestBody request: UpdateItemRequest): ItemResponse = ItemResponse.from(updateItemUseCase.update(request.toCommand(id)))
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

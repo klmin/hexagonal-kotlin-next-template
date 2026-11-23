@@ -16,7 +16,7 @@
 
 ```bash
 # backend (JDK 25)
-cd backend && ./gradlew build
+cd backend && ./gradlew build   # 포맷 검사(ktlint) 포함. 포맷 고치기: ./gradlew spotlessApply
 
 # frontend (Node 22.22.2+, 24.15+ 또는 26+. CI와 Docker 이미지는 26 LTS)
 cd frontend && npm ci

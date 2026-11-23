@@ -51,7 +51,10 @@ import com.example.template.item.application.port.`in`.CreateItemUseCase
 
 ### 3. 어노테이션 대상 (`@field:`)
 
-생성자 프로퍼티에 `@NotBlank`를 그냥 붙이면 **생성자 파라미터**에 붙는다. Bean Validation은 필드를 보므로 검증이 안 된다.
+생성자 프로퍼티(`val name`)는 파라미터, 필드, getter가 한 번에 생기는 자리라 어노테이션이 어디에 붙을지 정해야 한다.
+예전 코틀린은 **생성자 파라미터에만** 붙여서, Bean Validation(필드를 봄)이 `@NotBlank`를 못 보고 검증이 조용히 빠졌다.
+코틀린 2.4(이 저장소)는 기본으로 **파라미터와 필드 모두**에 붙여서 `@NotBlank`만 써도 동작한다(그 전 버전에서는 `-Xannotation-default-target=param-property` 옵션으로 켜야 했다. 2.4에서 이 옵션을 주면 "redundant" 경고가 난다).
+그래도 이 저장소는 의도를 드러내고 버전에 상관없이 같게 동작하도록 `@field:`를 명시한다.
 
 ```kotlin
 data class CreateItemRequest(
@@ -70,7 +73,8 @@ data class CreateItemRequest(
 
 ### 5. Spring 의 `@Nullable` 이 타입이 된다
 
-`-Xjsr305=strict` 설정과 Spring 7의 JSpecify 어노테이션 때문에, Spring이 nullable로 표시한 값은 코틀린에서 `?` 타입이다.
+Spring 7은 JSpecify(`@Nullable`)로 null 가능 여부를 표시하고, 코틀린 2.x는 이를 기본으로 엄격하게 반영한다. 그래서 Spring이 nullable로 표시한 값은 코틀린에서 `?` 타입이다.
+(`-Xjsr305=strict`는 아직 JSR-305 어노테이션을 쓰는 다른 라이브러리까지 같은 방식으로 맞춘다)
 
 - `ObservationConfig`: `context.carrier`가 `HttpServletRequest?`라서 `context.carrier?.requestURI`로 써야 컴파일된다. 자바는 경고 없이 통과한다
 - `GlobalExceptionHandler`: 부모 메서드 반환 타입이 `ResponseEntity<Any>?`
@@ -126,6 +130,26 @@ Mockito는 기본값(null, 0)을 돌려준다.
 
 `internal class ItemPersistenceAdapter`를 테스트 클래스의 public 프로퍼티로 두면 "internal 타입 노출" 컴파일 오류가 난다.
 `@Autowired private lateinit var adapter: ItemPersistenceAdapter`처럼 private으로 둔다.
+
+### 13. checked 예외와 트랜잭션 롤백
+
+Spring `@Transactional`은 기본으로 RuntimeException/Error에서만 롤백하고, checked 예외(`IOException` 등)는 **커밋**한다.
+자바는 `throws IOException`이 시그니처에 드러나서 알아채기 쉽지만, 코틀린에는 checked 예외가 없어 서비스가 자바 API를 부르다 `IOException`이 나도 아무 표시가 없다.
+그러면 앞에서 저장한 내용이 반쯤 커밋된다.
+
+`common/config/TransactionConfig.kt`에서 `@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)`로 모든 예외에서 롤백하게 했다.
+`TransactionConfigTest`가 이 동작을 확인한다(설정을 빼면 실패한다). 메서드마다 `@Transactional(rollbackFor = [Exception::class])`를 붙이는 방법도 있지만 빠뜨리기 쉽다.
+
+### 14. 경고는 오류로
+
+`build.gradle.kts`의 `allWarningsAsErrors = true`로 컴파일 경고가 있으면 빌드가 실패한다. 플랫폼 타입, 불필요한 `!!` 같은 null 관련 경고가 쌓이지 않게 한다.
+
+### 15. 포맷과 린트 (ktlint)
+
+자바 버전에는 백엔드 포맷 검사가 없지만, 코틀린 버전은 Spotless + ktlint를 `./gradlew build`에 넣었다. 어긋나면 빌드가 실패하고 `./gradlew spotlessApply`로 고친다.
+
+- 스타일은 `intellij_idea` (루트 `.editorconfig`). 기본값 `ktlint_official`은 파라미터 두 개짜리 함수도 여러 줄로 나눠서 IntelliJ의 Reformat Code와 계속 부딪힌다
+- `package-name` 규칙은 껐다. 백틱 패키지(`` port.`in` ``)를 허용하지 않기 때문이다 (1번)
 
 ## 직접 해 보기
 

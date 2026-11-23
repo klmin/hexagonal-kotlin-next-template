@@ -11,6 +11,12 @@ indent_size = 2
 [*.{kt,kts,gradle}]
 indent_size = 4
 
+[*.{kt,kts}]
+# ktlint (backend 의 spotless). IntelliJ 의 Reformat Code 와 충돌하지 않게 intellij_idea 스타일
+ktlint_code_style = intellij_idea
+# port.`in`, adapter.`in` 패키지(백틱)를 허용한다. 패키지를 inbound 로 바꾸면 지워도 된다 (docs/kotlin-vs-java.md 1번)
+ktlint_standard_package-name = disabled
+
 [*.md]
 trim_trailing_whitespace = false
 

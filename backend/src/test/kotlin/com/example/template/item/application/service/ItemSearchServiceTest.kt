@@ -19,6 +19,7 @@ class ItemSearchServiceTest {
             .take(limit)
             .map { Item.restore(it, "item-$it", null, NOW) }
     }
+
     // 받은 인자를 기록하고 고정된 결과를 돌려준다
     private val searchCalls = mutableListOf<String>()
     private val searchPort = SearchItemsPort { keyword, offset, limit ->

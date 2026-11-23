@@ -11,7 +11,10 @@ import org.springframework.stereotype.Component
 @Component
 internal class ItemPersistenceAdapter(
     private val repository: ItemJpaRepository,
-) : SaveItemPort, LoadItemPort, UpdateItemPort, DeleteItemPort {
+) : SaveItemPort,
+    LoadItemPort,
+    UpdateItemPort,
+    DeleteItemPort {
 
     override fun save(item: Item): Item = repository.save(item.toEntity()).toDomain()
 

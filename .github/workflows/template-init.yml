@@ -75,4 +75,4 @@ jobs:
 
       - name: Build and test
         working-directory: backend
-        run: ./gradlew build
+        run: ./gradlew spotlessApply build   # 초기화 스크립트 안내와 같은 순서

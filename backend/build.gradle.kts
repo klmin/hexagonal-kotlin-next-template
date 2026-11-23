@@ -7,6 +7,8 @@ plugins {
     kotlin("plugin.jpa") version "2.4.21"
     id("org.springframework.boot") version "4.2.0"
     id("io.spring.dependency-management") version "1.1.7"
+    // 코드 포맷/린트 (ktlint). ./gradlew build 의 check 에 spotlessCheck 가 포함된다. 고치기: ./gradlew spotlessApply
+    id("com.diffplug.spotless") version "8.11.0"
 }
 
 group = "com.example"
@@ -15,8 +17,12 @@ version = "0.0.1-SNAPSHOT"
 kotlin {
     jvmToolchain(25)
     compilerOptions {
-        // Spring/JSpecify 의 @Nullable 정보를 코틀린 타입(String?)으로 엄격하게 반영한다
+        // Spring 7 은 JSpecify(@Nullable)를 쓰고 코틀린 2.x 는 이를 기본으로 엄격하게 반영한다.
+        // -Xjsr305=strict 는 아직 JSR-305(javax.annotation) 를 쓰는 라이브러리까지 같은 방식으로 맞춘다.
+        // (코틀린 2.4 부터 생성자 프로퍼티의 어노테이션은 기본으로 파라미터와 필드 모두에 붙는다. docs/kotlin-vs-java.md 3번)
         freeCompilerArgs.addAll("-Xjsr305=strict")
+        // 경고를 오류로. 지금 경고가 0개라 비용이 없고, null 관련 경고가 쌓이지 않게 막는다
+        allWarningsAsErrors = true
         // 파라미터 이름을 바이트코드에 남긴다. 검증 오류의 field("size")와 @RequestParam 이름 추론에 필요
         javaParameters = true
     }
@@ -81,32 +87,35 @@ val migrationDir = layout.projectDirectory.dir("src/main/resources/db/migration"
 val jooqOutputDir = layout.buildDirectory.dir("generated-sources/jooq")
 val jooqPackage = "com.example.template.common.jooq"
 
-val generateJooq = tasks.register<JavaExec>("generateJooq") {
-    group = "build"
-    description = "Flyway 마이그레이션으로 jOOQ 코드를 생성한다 (Docker 필요)"
-    classpath = jooqCodegen.runtimeClasspath
-    // 코틀린 최상위 main 함수는 <파일이름>Kt 클래스로 컴파일된다
-    mainClass = "codegen.JooqCodegenKt"
-    // 안내 메시지(한글)가 Windows 기본 인코딩(MS949)으로 나와 Gradle 출력에서 깨지지 않게
-    jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
-    inputs.dir(migrationDir).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(jooqCodegen.runtimeClasspath).withNormalizer(ClasspathNormalizer::class)
-    // 패키지를 바꾸면(scripts/init-project.mjs) 다시 생성되게 입력으로 등록한다
-    inputs.property("jooqPackage", jooqPackage)
-    outputs.dir(jooqOutputDir)
-    outputs.cacheIf { true }
-    argumentProviders.add(CommandLineArgumentProvider {
-        listOf(
-            migrationDir.asFile.absolutePath,
-            jooqOutputDir.get().asFile.absolutePath,
-            jooqPackage,
+val generateJooq =
+    tasks.register<JavaExec>("generateJooq") {
+        group = "build"
+        description = "Flyway 마이그레이션으로 jOOQ 코드를 생성한다 (Docker 필요)"
+        classpath = jooqCodegen.runtimeClasspath
+        // 코틀린 최상위 main 함수는 <파일이름>Kt 클래스로 컴파일된다
+        mainClass = "codegen.JooqCodegenKt"
+        // 안내 메시지(한글)가 Windows 기본 인코딩(MS949)으로 나와 Gradle 출력에서 깨지지 않게
+        jvmArgs("-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
+        inputs.dir(migrationDir).withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.files(jooqCodegen.runtimeClasspath).withNormalizer(ClasspathNormalizer::class)
+        // 패키지를 바꾸면(scripts/init-project.mjs) 다시 생성되게 입력으로 등록한다
+        inputs.property("jooqPackage", jooqPackage)
+        outputs.dir(jooqOutputDir)
+        outputs.cacheIf { true }
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                listOf(
+                    migrationDir.asFile.absolutePath,
+                    jooqOutputDir.get().asFile.absolutePath,
+                    jooqPackage,
+                )
+            },
         )
-    })
-    // 이전 패키지로 생성된 코드가 남아 같이 컴파일되지 않게 비우고 생성한다
-    doFirst {
-        jooqOutputDir.get().asFile.deleteRecursively()
+        // 이전 패키지로 생성된 코드가 남아 같이 컴파일되지 않게 비우고 생성한다
+        doFirst {
+            jooqOutputDir.get().asFile.deleteRecursively()
+        }
     }
-}
 
 // 생성 코드도 코틀린(KotlinGenerator)이라 kotlin 소스로 등록한다
 kotlin.sourceSets.main {
@@ -120,42 +129,67 @@ tasks.withType<Test> {
         events("skipped", "failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
-    addTestListener(object : TestListener {
-        override fun beforeSuite(suite: TestDescriptor) {}
-        override fun beforeTest(testDescriptor: TestDescriptor) {}
-        override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {}
-        override fun afterSuite(suite: TestDescriptor, result: TestResult) {
-            if (suite.parent == null) {
-                println(
-                    "Tests: ${result.testCount}, passed: ${result.successfulTestCount}, " +
-                        "failed: ${result.failedTestCount}, skipped: ${result.skippedTestCount}"
-                )
+    addTestListener(
+        object : TestListener {
+            override fun beforeSuite(suite: TestDescriptor) {}
+
+            override fun beforeTest(testDescriptor: TestDescriptor) {}
+
+            override fun afterTest(
+                testDescriptor: TestDescriptor,
+                result: TestResult,
+            ) {}
+
+            override fun afterSuite(
+                suite: TestDescriptor,
+                result: TestResult,
+            ) {
+                if (suite.parent == null) {
+                    println(
+                        "Tests: ${result.testCount}, passed: ${result.successfulTestCount}, " +
+                            "failed: ${result.failedTestCount}, skipped: ${result.skippedTestCount}",
+                    )
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 // openapi/openapi.json(API 계약)을 현재 코드 기준으로 다시 쓴다 (Docker 필요)
 tasks.register<Test>("updateOpenApi") {
     group = "documentation"
     description = "openapi/openapi.json 을 현재 API로 갱신한다"
-    testClassesDirs = sourceSets.test.get().output.classesDirs
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     filter.includeTestsMatching("*OpenApiSpecTests")
     systemProperty("openapi.update", "true")
     outputs.upToDateWhen { false }
     // Docker가 없으면 테스트가 skip되어 스펙을 갱신하지 못한 채 성공으로 끝나므로 실패시킨다
     var updated = false
-    addTestListener(object : TestListener {
-        override fun beforeSuite(suite: TestDescriptor) {}
-        override fun beforeTest(testDescriptor: TestDescriptor) {}
-        override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {}
-        override fun afterSuite(suite: TestDescriptor, result: TestResult) {
-            if (suite.parent == null) {
-                updated = result.successfulTestCount > 0
+    addTestListener(
+        object : TestListener {
+            override fun beforeSuite(suite: TestDescriptor) {}
+
+            override fun beforeTest(testDescriptor: TestDescriptor) {}
+
+            override fun afterTest(
+                testDescriptor: TestDescriptor,
+                result: TestResult,
+            ) {}
+
+            override fun afterSuite(
+                suite: TestDescriptor,
+                result: TestResult,
+            ) {
+                if (suite.parent == null) {
+                    updated = result.successfulTestCount > 0
+                }
             }
-        }
-    })
+        },
+    )
     doLast {
         if (!updated) {
             throw GradleException("openapi/openapi.json 을 갱신하지 못했습니다. Docker를 실행한 뒤 다시 실행하세요.")
@@ -166,4 +200,16 @@ tasks.register<Test>("updateOpenApi") {
 // Docker 이미지에는 실행 jar(bootJar) 하나만 쓴다
 tasks.jar {
     enabled = false
+}
+
+// ktlint 규칙은 루트 .editorconfig 의 [*.{kt,kts}] 를 따른다. jOOQ 생성 코드(build/)는 대상이 아니다
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        ktlint("1.8.0").setEditorConfigPath(rootProject.file("../.editorconfig"))
+    }
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.8.0").setEditorConfigPath(rootProject.file("../.editorconfig"))
+    }
 }
