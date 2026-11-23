@@ -54,17 +54,18 @@ common/jooq/                         jOOQ 생성 코드 (빌드 시 생성, 커�
 - `common`은 특정 기능을 참조하지 않는다
 - jOOQ(`org.jooq`, `common.jooq`)는 adapter.out에서만 사용
 - Spring Security는 application, domain에서 사용 금지. 인증 정보는 adapter.in에서 꺼내 Command에 사용자 id로 넘긴다
+- adapter.out의 최상위 클래스(JPA 엔티티, 리포지토리, 어댑터)는 `internal`(또는 `private`). 엔티티를 어댑터 밖으로 내보내지 않고 도메인 모델로 변환한다
+- `@Transactional`(클래스, 메서드)은 `application.service`에만
+- 현재 시각은 `Clock` Bean 주입. `Instant.now()`, `LocalDateTime.now()` 같은 직접 호출 금지(`now(clock)`은 허용), `Clock.systemUTC()` 등은 `common.config`에서만
 
 그 외:
 
-- JPA 엔티티, 리포지토리, 어댑터는 `internal`. 엔티티를 어댑터 밖으로 내보내지 않고 도메인 모델로 변환한다
 - 수정은 서비스에서 조회 -> 도메인 메서드로 변경 -> `Update...Port`로 넘기고, 어댑터가 영속 엔티티에 값을 옮겨 더티 체킹으로 반영한다 (`ItemPersistenceAdapter.update` 참고)
 - 도메인 규칙 위반은 `DomainValidationException`(400), 없는 리소스는 `NotFoundException`을 상속한 기능 예외(404)
 - 목록 API는 커서 페이징이 기본이다 (`ListItemsQuery`, `ItemCursor` 참고). 전체 목록을 한 번에 돌려주는 API를 만들지 않는다
 - 저장/수정은 JPA, 검색/통계 같은 조회는 jOOQ. jOOQ 코드는 Flyway 마이그레이션으로 빌드 때 생성되니 직접 고치지 않는다
 - 스키마 변경은 Flyway `V{n}__설명.sql`로만. 머지된 마이그레이션은 고치지 않는다
 - 로그는 SLF4J로 남긴다. traceId는 자동으로 붙으니 직접 넣지 않는다. 개인정보, 비밀값은 로그에 남기지 않는다
-- 현재 시각은 `Clock` Bean 주입 (`Instant.now()` 직접 호출 X)
 
 ### 코틀린 (자세한 이유는 docs/kotlin-vs-java.md)
 
