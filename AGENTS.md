@@ -32,7 +32,7 @@ npm run format:check && npm run lint && npm run typecheck && npm test && npm run
 패키지 루트는 `com.example.template`. 기능마다 패키지를 만들고 그 안을 아래처럼 나눈다.
 
 ```
-<feature>/domain/                    도메인 모델, 규칙. Spring/JPA/Validation 의존 금지
+<feature>/domain/                    도메인 모델, 규칙. Spring/JPA/Validation/Jackson/Swagger 의존 금지
 <feature>/application/port/in/       유스케이스 인터페이스 (+ Command/Query data class)
 <feature>/application/port/out/      외부 의존 포트 인터페이스
 <feature>/application/service/       유스케이스 구현. @Transactional은 여기
@@ -50,6 +50,7 @@ common/jooq/                         jOOQ 생성 코드 (빌드 시 생성, 커�
 - 기능 안에서는 `adapter -> application -> domain` 방향만
 - 컨트롤러(adapter.in)는 `port.in`만 사용. 서비스나 `port.out`을 직접 쓰지 않는다
 - adapter.in과 adapter.out은 서로 참조하지 않는다
+- `port.out`과 adapter.out은 `port.in`(Command/Query/Result)을 쓰지 않는다. 출력 포트는 전용 타입을 쓴다 (예: `ItemPageResult`)
 - 다른 기능은 그 기능의 `application.port.in`과 `domain`으로만 접근. 기능 간 순환 참조 금지
 - `common`은 특정 기능을 참조하지 않는다
 - jOOQ(`org.jooq`, `common.jooq`)는 adapter.out에서만 사용
