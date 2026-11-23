@@ -28,5 +28,9 @@ class ItemSearchService(
         return ItemListResult(page, page.last().id)
     }
 
-    override fun search(query: SearchItemsQuery): ItemSearchResult = searchItemsPort.search(query)
+    // page 번호를 저장소가 쓰는 offset 으로 바꾸고, 결과에 page 정보를 붙인다
+    override fun search(query: SearchItemsQuery): ItemSearchResult {
+        val page = searchItemsPort.search(query.keyword, query.page.toLong() * query.size, query.size)
+        return ItemSearchResult(page.items, page.totalCount, query.page, query.size)
+    }
 }
