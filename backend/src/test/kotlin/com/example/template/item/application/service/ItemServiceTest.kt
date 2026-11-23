@@ -69,8 +69,11 @@ class ItemServiceTest {
     private class InMemoryItemStore : SaveItemPort, LoadItemPort, UpdateItemPort, DeleteItemPort {
         private val items = mutableListOf<Item>()
 
+        // 실제 DB 시퀀스처럼 지워도 번호를 재사용하지 않는다 (items.size + 1 은 삭제 뒤 중복 id 를 만든다)
+        private var sequence = 0L
+
         override fun save(item: Item): Item =
-            Item.restore(items.size + 1L, item.name, item.description, item.createdAt).also { items += it }
+            Item.restore(++sequence, item.name, item.description, item.createdAt).also { items += it }
 
         override fun findById(id: Long): Item? = items.find { it.id == id }
 
