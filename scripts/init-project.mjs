@@ -7,7 +7,7 @@
 //   - build.gradle.kts group -> 패키지의 앞부분 (com.acme.shop -> com.acme)
 //   - README 제목, compose 프로젝트 이름, 브라우저 탭 제목(layout.tsx) -> --name
 //   - CODEOWNERS, LICENSE 소유자 -> --owner (사용자 ID 또는 조직의 팀 org/team)
-// 끝나면 git diff로 확인하고 ./gradlew build 로 검증한다.
+// 끝나면 git diff로 확인하고 ./gradlew spotlessApply build 로 검증한다.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -182,6 +182,6 @@ for (const f of changed) console.log(`  ${f}`);
 console.log(`
 다음 단계
   1. git diff 로 변경 확인
-  2. cd backend && ./gradlew build   (openapi.json 은 패키지와 무관해서 그대로)
+  2. cd backend && ./gradlew spotlessApply build   (import 정렬이 패키지 이름에 따라 바뀔 수 있어 포맷부터. openapi.json 은 그대로)
   3. 샘플 item 기능은 참고 후 삭제하거나 실제 도메인으로 교체
   4. 이 스크립트(scripts/init-project.mjs)는 지워도 된다`);
