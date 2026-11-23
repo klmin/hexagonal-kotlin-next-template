@@ -1,0 +1,51 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'openapi/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'openapi/**'
+      - '.github/workflows/backend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      # Testcontainers 테스트 포함 (ubuntu 러너에는 Docker가 있음)
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Docker 이미지 빌드 확인
+        run: docker build -t backend .
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-test-reports
+          path: backend/build/reports/tests

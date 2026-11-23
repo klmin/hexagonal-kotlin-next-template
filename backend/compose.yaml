@@ -1,0 +1,10 @@
+# bootRun 하면 spring-boot-docker-compose가 자동으로 띄움
+services:
+  postgres:
+    image: 'postgres:18-alpine'
+    environment:
+      - 'POSTGRES_DB=template'
+      - 'POSTGRES_USER=template'
+      - 'POSTGRES_PASSWORD=template'
+    ports:
+      - '5432'

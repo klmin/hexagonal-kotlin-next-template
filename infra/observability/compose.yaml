@@ -1,0 +1,93 @@
+# 모니터링 스택: Alloy(수집) -> Prometheus(메트릭), Loki(로그), Tempo(트레이스) -> Grafana
+#
+#   cd infra/observability
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Grafana: http://localhost:3300 (admin / admin)
+# 포트가 겹치면 .env에서 바꾼다.
+name: template-observability
+
+services:
+  alloy:
+    image: grafana/alloy:v1.22.0
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      APP_METRICS_TARGET: ${APP_METRICS_TARGET:-host.docker.internal:8081}
+      APP_NAME: ${APP_NAME:-backend}
+      APP_ENV: ${APP_ENV:-local}
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      - ${APP_LOG_DIR:-../../backend/logs}:/var/log/app:ro
+    ports:
+      - "${ALLOY_UI_PORT:-12345}:12345"
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on: [prometheus, loki, tempo]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.10
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:3.1.1
+    command: -config.file=/etc/tempo/config.yaml
+    # 기본 사용자(10001)는 새 볼륨에 쓸 수 없어서 root로 띄운다 (로컬용)
+    user: "0"
+    volumes:
+      - ./tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      APP_NAME: ${APP_NAME:-backend}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3300}:3000"
+    depends_on: [prometheus, loki, tempo]
+    restart: unless-stopped
+
+volumes:
+  alloy-data:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  grafana-data:

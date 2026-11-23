@@ -1,0 +1,53 @@
+# Tempo 단일 실행(monolithic, Tempo 3). 저장은 도커 볼륨(tempo-data)
+# 단일 실행은 Kafka 없이 동작한다. S3로 옮기려면 storage.trace.backend를 s3로 바꾼다.
+# 설정 기준: https://github.com/grafana/tempo/tree/main/example/docker-compose/single-binary
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: info
+
+# Alloy 가 OTLP 로 보내는 트레이스 수신
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# 트레이스로 만든 메트릭(서비스 그래프, 구간별 요청 수/지연) → Prometheus
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+# 검색/TraceQL 은 기본으로 최근 30초를 빼고 조회한다(아직 쓰는 중인 데이터를 피하려고).
+# 로컬에서 API를 호출하고 바로 찾아볼 수 있게 줄인다. 0 이면 fail_on_high_lag 와 함께 쓸 수 없다
+query_frontend:
+  query_end_cutoff: 5s
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+    # 보관 기간 14일 (Tempo 3 에서는 compactor 대신 backend worker 가 지운다)
+    compaction:
+      block_retention: 336h
+
+usage_report:
+  reporting_enabled: false

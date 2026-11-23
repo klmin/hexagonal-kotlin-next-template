@@ -1,0 +1,58 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      spring:
+        patterns: ['org.springframework*']
+      others:
+        patterns: ['*']
+        exclude-patterns: ['org.springframework*']
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      next-react:
+        patterns: ['next', 'eslint-config-next', 'react', 'react-dom', '@types/react*']
+      others:
+        patterns: ['*']
+        exclude-patterns: ['next', 'eslint-config-next', 'react', 'react-dom', '@types/react*']
+    ignore:
+      # openapi-typescript(7.x)가 peer로 typescript ^5만 받아서 7로 올리면 npm ci가 실패한다.
+      # openapi-typescript가 7을 지원하면 지운다.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Dockerfile, compose 이미지 태그 (postgres, eclipse-temurin, node, 모니터링 스택)
+  - package-ecosystem: docker
+    directories: ['/backend', '/frontend']
+    schedule:
+      interval: weekly
+    ignore:
+      # 런타임 메이저는 LTS에 맞춰 직접 올린다(홀수 Node, 비 LTS JDK가 올라오지 않게).
+      # Node는 frontend package.json engines, CI node-version과, JDK는 build.gradle.kts toolchain과 같이 바꾼다
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
+      - dependency-name: eclipse-temurin
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker-compose
+    directories: ['/', '/backend', '/infra/observability']
+    schedule:
+      interval: weekly
+    groups:
+      observability:
+        patterns: ['grafana/*', 'prom/*']
+    ignore:
+      # PostgreSQL 메이저는 기존 데이터 볼륨과 호환되지 않아 직접 올린다
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']

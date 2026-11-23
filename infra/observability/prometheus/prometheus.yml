@@ -1,0 +1,8 @@
+# Prometheus는 Alloy가 remote_write로 보내는 메트릭을 저장만 한다.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

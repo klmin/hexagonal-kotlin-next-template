@@ -1,0 +1,42 @@
+# Loki 단일 실행. 저장은 도커 볼륨(loki-data)
+# S3로 옮기려면 common.storage, schema_config.object_store를 s3로 바꾼다.
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: info
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 336h          # 14일
+  allow_structured_metadata: true # trace_id 등
+  volume_enabled: true
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+pattern_ingester:
+  enabled: true                   # Grafana Logs Drilldown 의 패턴 보기

@@ -1,0 +1,132 @@
+# 자바 버전과 다른 점
+
+이 저장소는 [hexagonal-java-next-template](https://github.com/klmin/hexagonal-java-next-template)의 백엔드를 코틀린으로 옮긴 것이다.
+패키지 구조, API(`openapi/openapi.json`), 프론트, 인프라, ArchUnit 규칙은 같다. 같은 E2E 테스트가 두 백엔드에서 모두 통과한다.
+
+두 저장소의 같은 파일을 나란히 열어 보면서 읽는 것을 추천한다. 코드 주석에도 "자바에서는 이렇게, 코틀린에서는 이래서 이렇게"를 적어 두었다.
+
+## 한눈에 보기
+
+| 자바 | 코틀린 | 예시 파일 |
+|---|---|---|
+| `record` | `data class` | `CreateItemCommand.kt` |
+| record compact constructor 검증 | `init { }` 블록 | `ListItemsQuery.kt` |
+| `private static final` 상수 | `companion object` 의 `const val` | `Item.kt` |
+| `static` 팩토리 메서드 | `companion object` 안의 함수 | `Item.create`, `Item.restore` |
+| 유틸 클래스(private 생성자 + static) | `object` | `ItemCursor.kt` |
+| `Optional<Item>` | `Item?` + `?:` (엘비스) | `LoadItemPort.kt`, `ItemService.getItem` |
+| `repository.findById(id).map(...)` | `repository.findByIdOrNull(id)?.let(...)` | `ItemPersistenceAdapter.kt` |
+| package-private | `internal` (모듈 단위라 더 넓다) | `ItemJpaEntity.kt` |
+| 생성자 + 필드 대입 | 주 생성자의 `private val` | `ItemService.kt` |
+| `new ArchCondition<>() { }` | `object : ArchCondition<...>() { }` | `HexagonalArchitectureTest.kt` |
+| try-with-resources | `.use { }` | `JooqCodegen.kt` |
+| `@MockitoBean`, `given().willReturn()` | `@MockkBean`, `every { } returns` | `ItemControllerTest.kt` |
+| `mockMvc.perform(post(...)).andExpect(status().isOk())` | `mockMvc.post(...) { }.andExpect { status { isOk() } }` | `ItemControllerTest.kt` |
+| `"""` 텍스트 블록 | `"""` 원시 문자열 | `ItemControllerTest.kt` |
+| jOOQ `JavaGenerator` | `KotlinGenerator` (NOT NULL 컬럼이 non-null 타입) | `JooqCodegen.kt` |
+
+## 실제로 부딪히는 것들
+
+### 1. `in` 은 예약어다
+
+`port.in`, `adapter.in` 패키지를 코틀린에서는 그대로 쓸 수 없다. 백틱으로 감싼다.
+
+```kotlin
+package com.example.template.item.application.port.`in`
+import com.example.template.item.application.port.`in`.CreateItemUseCase
+```
+
+자바 버전과 구조를 똑같이 맞추려고 백틱을 썼다. 새 프로젝트라면 `port.inbound` / `port.outbound`로 이름을 바꾸는 것도 방법이다.
+그 경우 `HexagonalArchitectureTest`의 패키지 이름과 `AGENTS.md`도 같이 바꾼다. `out`은 예약어가 아니라 그대로 쓸 수 있다.
+
+### 2. 클래스는 기본이 final 이다
+
+코틀린 클래스는 기본으로 상속할 수 없다. Spring은 `@Transactional`, `@Configuration` 같은 기능을 프록시(하위 클래스)로 만들고, JPA는 지연 로딩 프록시를 만든다.
+
+- `kotlin("plugin.spring")`: `@Component`, `@Service`, `@Transactional`, `@Configuration` 등이 붙은 클래스를 open으로
+- `allOpen { annotation("jakarta.persistence.Entity") }`: JPA 엔티티를 open으로 (plugin.spring은 엔티티를 열지 않는다)
+- `kotlin("plugin.jpa")`: 엔티티에 인자 없는 생성자를 만든다
+
+설정은 `backend/build.gradle.kts`.
+
+### 3. 어노테이션 대상 (`@field:`)
+
+생성자 프로퍼티에 `@NotBlank`를 그냥 붙이면 **생성자 파라미터**에 붙는다. Bean Validation은 필드를 보므로 검증이 안 된다.
+
+```kotlin
+data class CreateItemRequest(
+    @field:NotBlank @field:Size(max = Item.NAME_MAX_LENGTH) val name: String?,
+)
+```
+
+`@Schema`도 같은 이유로 `@field:Schema`로 쓴다. 반대로 `@Column`, `@Id`처럼 파라미터에 붙일 수 없는 어노테이션은 알아서 필드로 간다.
+
+### 4. 요청 DTO 는 nullable 로 받는다
+
+`name: String`(non-null)이면 `name`이 빠진 요청을 Jackson이 역직렬화 단계에서 실패시킨다.
+그러면 "입력값을 확인해 주세요 + errors[].field" 응답이 아니라 JSON 형식 오류가 된다.
+`name: String?` + `@field:NotBlank`로 받아서 Bean Validation이 처리하게 하고, 검증을 통과한 뒤 `toCommand()`에서 `name!!`로 꺼낸다.
+`ItemControllerTest.createRejectsMissingName`이 이 동작을 확인한다.
+
+### 5. Spring 의 `@Nullable` 이 타입이 된다
+
+`-Xjsr305=strict` 설정과 Spring 7의 JSpecify 어노테이션 때문에, Spring이 nullable로 표시한 값은 코틀린에서 `?` 타입이다.
+
+- `ObservationConfig`: `context.carrier`가 `HttpServletRequest?`라서 `context.carrier?.requestURI`로 써야 컴파일된다. 자바는 경고 없이 통과한다
+- `GlobalExceptionHandler`: 부모 메서드 반환 타입이 `ResponseEntity<Any>?`
+
+자바에서 런타임 NPE가 될 수 있던 곳을 컴파일러가 미리 알려 주는 셈이다.
+
+### 6. null 을 타입으로 막는다
+
+`Item.restore(id: Long, ...)`는 `id`가 non-null 타입이라 `null`을 넘기는 코드가 컴파일되지 않는다.
+그래서 자바 버전의 `restoreRequiresId` 테스트는 코틀린 버전에 없다.
+
+`Item.id`는 `Long?`이다(저장 전에는 없음). 저장된 Item만 다루는 곳(응답 변환, 어댑터)에서는 `item.id!!`로 꺼낸다.
+
+### 7. data class 를 쓰지 않는 곳
+
+- **도메인 모델(`Item`)**: data class는 `copy()`가 생겨서 생성자 검증을 거치지 않은 객체를 만들 수 있다. 일반 class + private 생성자 + `create`/`restore`
+- **JPA 엔티티(`ItemJpaEntity`)**: equals/hashCode가 모든 필드를 비교해서 지연 로딩, 영속성 컨텍스트와 맞지 않는다
+- **값을 정리해서 저장해야 하는 Query(`SearchItemsQuery`)**: data class 생성자 프로퍼티는 바꿀 수 없다. private 생성자 + `companion object`의 `operator fun invoke`로 정리한 값을 넘긴다. `@ConsistentCopyVisibility`로 `copy()`도 private으로 막는다
+
+### 8. 엔티티의 setter 막기
+
+```kotlin
+@Column(nullable = false, length = 100)
+var name: String = name
+    protected set
+```
+
+밖에서는 읽기만 하고 값은 `update()`로만 바꾼다. 엔티티가 open 클래스라 `private set`은 쓸 수 없어서 `protected set`이다.
+
+### 9. springdoc 이 nullable 을 스펙에 넣는다
+
+springdoc은 `String?`을 보면 스펙에 `"type": ["string", "null"]`로 적는다. 요청 DTO는 nullable로 받으므로(4번) 자바 버전과 스펙이 달라진다.
+`application.yml`에서 `springdoc.model-converters.kotlin-nullable-property-customizer.enabled: false`로 끄고,
+응답의 nullable 필드는 자바 버전처럼 `@field:Schema(types = ["string", "null"])`로 직접 적었다. 그래서 `openapi.json`(=프론트 타입)이 자바 버전과 같다.
+
+### 10. ArchUnit 과 companion object
+
+ArchUnit은 바이트코드를 보므로 규칙은 그대로 동작한다. 다만
+
+- `@ArchTest` 필드는 static이어야 해서 `companion object` 안에 `@JvmField`로 둔다
+- `companion object`는 `ListItemsQuery$Companion` 같은 중첩 클래스가 된다. "port 안의 클래스는 인터페이스" 규칙에 걸리지 않게 `areTopLevelClasses()`를 추가했다
+- `internal`은 바이트코드에서 public이라, package-private처럼 "어댑터 밖에서 엔티티를 못 쓰게" 컴파일러가 막아 주지는 않는다(같은 모듈 안에서는 보인다). 엔티티를 밖으로 내보내지 않는 규칙은 리뷰와 ArchUnit(`adapter.out` 은 다른 계층에서 참조 금지)으로 지킨다
+
+### 11. MockK 는 기본이 엄격하다
+
+stub 하지 않은 메서드를 부르면 예외가 난다. 반환값이 없는 메서드도 `justRun { useCase.delete(1L) }`처럼 허용해 둬야 한다.
+Mockito는 기본값(null, 0)을 돌려준다.
+
+### 12. 테스트에서 internal 타입
+
+`internal class ItemPersistenceAdapter`를 테스트 클래스의 public 프로퍼티로 두면 "internal 타입 노출" 컴파일 오류가 난다.
+`@Autowired private lateinit var adapter: ItemPersistenceAdapter`처럼 private으로 둔다.
+
+## 직접 해 보기
+
+1. `Item`에 규칙을 하나 추가해 보기 (예: 이름에 금지어). 도메인 테스트부터 쓴다
+2. 기능 하나를 새로 만들어 보기 (`.claude/skills/add-backend-usecase`의 순서). 자바 버전과 같은 순서로 하되 코틀린 문법으로
+3. `port.in` 을 `port.inbound`로 바꿔 보기. ArchUnit 규칙과 문서까지 고쳐서 빌드가 통과하게
+4. 일부러 규칙을 어겨 보기: 서비스에서 `ItemJpaRepository`를 주입하면 ArchUnit이 막는지 확인
