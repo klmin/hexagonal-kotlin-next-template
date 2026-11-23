@@ -1,0 +1,78 @@
+name: template-init
+
+# scripts/init-project.mjs 로 이름, 패키지를 바꾼 뒤에도 백엔드가 빌드되는지 확인한다.
+# 패키지는 일반(com.acme.shop), 기존 패키지의 하위(com.example.template.shop), 상위(com.example)를 모두 본다
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/template-init.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/template-init.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  template-init:
+    name: template-init (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [com.acme.shop, com.example.template.shop, com.example]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: dry-run 은 파일을 바꾸지 않는다
+        run: |
+          node scripts/init-project.mjs --name my-shop --package "${{ matrix.package }}" --owner my-github-id --dry-run
+          git diff --exit-code
+
+      - name: 초기화
+        run: node scripts/init-project.mjs --name my-shop --package "${{ matrix.package }}" --owner my-github-id
+
+      - name: 템플릿 전용 워크플로가 지워졌는지 확인
+        run: |
+          if [ -e .github/workflows/template-init.yml ]; then
+            echo "init-project.mjs 가 template-init.yml 을 지우지 않았습니다"
+            exit 1
+          fi
+
+      - name: 이전 이름이 남지 않았는지 확인
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          left=$(git grep -n -I -E 'hexagonal-kotlin-next-template|Hexagonal Template|@klmin' -- ':!scripts/' ':!.github/workflows/template-init.yml' || true)
+          # 새 패키지가 기존 패키지를 포함하는 경우(com.example.template.shop)는 새 패키지 이름과
+          # 그 앞부분인 group(com.example.template)으로 남는 것만 허용
+          old=$(git grep -n -I -E 'com[./]example[./]template' -- ':!scripts/' ':!.github/workflows/template-init.yml' \
+            | grep -v -E "$(echo "$PACKAGE" | sed 's/\./[.\/]/g')" \
+            | grep -v -E '^backend/build\.gradle\.kts:[0-9]+:group = ' || true)
+          if [ -n "$left$old" ]; then
+            echo "$left"
+            echo "$old"
+            exit 1
+          fi
+
+      - name: Build and test
+        working-directory: backend
+        run: ./gradlew build
