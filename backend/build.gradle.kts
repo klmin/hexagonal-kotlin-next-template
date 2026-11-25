@@ -8,7 +8,7 @@ plugins {
     id("org.springframework.boot") version "4.2.0"
     id("io.spring.dependency-management") version "1.1.7"
     // 코드 포맷/린트 (ktlint). ./gradlew build 의 check 에 spotlessCheck 가 포함된다. 고치기: ./gradlew spotlessApply
-    id("com.diffplug.spotless") version "8.11.0"
+    id("com.diffplug.spotless") version "8.12.0"
 }
 
 group = "com.example"
