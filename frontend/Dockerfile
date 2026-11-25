@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # 루트가 아닌 사용자(nginx, uid 101)로 실행되는 이미지
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 # NGINX_ENTRYPOINT_LOCAL_RESOLVERS: 시작할 때 /etc/resolv.conf 의 DNS 서버를 NGINX_LOCAL_RESOLVERS 로 넣는다 (nginx 설정의 resolver)
 ENV BACKEND_URL=http://backend:8080 \
     NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
