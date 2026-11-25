@@ -20,12 +20,17 @@ export function EditItemPage() {
 }
 
 function EditItem({ id }: { id: number }) {
-  const { data, isPending, error } = useQuery({
+  // 폼은 처음 받은 값으로만 채워진다(defaultValue). 캐시에 남은 예전 값으로 시작하지 않게 서버에서 다시 받을 때까지 기다리고,
+  // 입력하는 동안에는 창 포커스, 재연결로 다시 불러오지 않는다
+  const { data, isFetching, error } = useQuery({
     queryKey: itemKeys.detail(id),
     queryFn: ({ signal }) => getItem(id, signal),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
-  if (isPending) {
+  if (isFetching || (!data && !error)) {
     return (
       <p role="status" className="text-sm text-muted-foreground">
         불러오는 중...

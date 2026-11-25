@@ -2,7 +2,8 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithQuery } from "@/test/render";
+import { itemKeys } from "@/lib/api/items";
+import { newQueryClient, renderWithQuery } from "@/test/render";
 
 import { App } from "./app";
 
@@ -32,6 +33,32 @@ describe("App 경로", () => {
 
     expect(await screen.findByLabelText("이름")).toHaveValue("노트북");
     expect(fetchMock.mock.calls[0][0]).toBe("/api/items/3");
+  });
+
+  it("수정 화면은 캐시에 남은 예전 값이 아니라 서버의 최신 값으로 폼을 채운다", async () => {
+    // 다른 탭에서 이름이 바뀐 상황: 캐시에는 예전 이름, 서버에는 새 이름
+    const queryClient = newQueryClient();
+    queryClient.setQueryData(itemKeys.detail(3), {
+      id: 3,
+      name: "예전 이름",
+      description: null,
+      createdAt: "2026-11-25T00:00:00Z",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () =>
+        Response.json({
+          id: 3,
+          name: "새 이름",
+          description: null,
+          createdAt: "2026-11-25T00:00:00Z",
+        }),
+      ),
+    );
+
+    renderWithQuery(<App />, { route: "/items/3/edit", queryClient });
+
+    expect(await screen.findByLabelText("이름")).toHaveValue("새 이름");
   });
 
   it("수정 화면에서 취소하면 목록으로 간다", async () => {
