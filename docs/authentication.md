@@ -9,7 +9,7 @@
 - 컨트롤러가 인증 정보에서 사용자 id를 꺼내 **Command/Query에 일반 값으로** 넘긴다
 - 서비스와 도메인은 Spring Security를 모른다. "작성자만 수정할 수 있다" 같은 **업무 규칙은 도메인**에 둔다
 - 오류 응답은 401, 403도 Problem Details로 한다
-- 프론트는 지금처럼 백엔드를 서버에서만 호출한다. 토큰을 브라우저 JavaScript로 내보내지 않는다
+- 프론트(CSR)는 같은 오리진의 `/api`로 호출한다. 토큰을 브라우저 JavaScript(localStorage 등)에 두지 않고 httpOnly 세션 쿠키를 쓴다 (아래 "프론트")
 
 `HexagonalArchitectureTest`가 이 중 일부를 검사한다.
 
@@ -39,7 +39,8 @@ common/error/                    ForbiddenException(403) 추가, GlobalException
 
 ## 백엔드 예시 (OIDC 리소스 서버)
 
-Keycloak 같은 OIDC 서버가 발급한 JWT를 검증하는 경우다.
+Keycloak 같은 OIDC 서버가 발급한 JWT를 검증하는 경우다. 모바일 앱이나 다른 서비스처럼 `Authorization` 헤더로 토큰을 보내는 클라이언트용이다.
+이 템플릿의 브라우저 화면은 아래 "프론트"처럼 세션 쿠키로 인증한다. 둘 다 필요하면 `SecurityFilterChain`을 경로별로 나눈다.
 
 ```kotlin
 // build.gradle.kts
@@ -80,7 +81,7 @@ class SecurityConfig {
             }
             oauth2ResourceServer { jwt { } }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
-            // 브라우저가 직접 호출하지 않고 Next.js 서버가 토큰으로 호출하므로 CSRF 토큰이 필요 없다
+            // 쿠키 없이 Authorization 헤더로만 인증하므로 CSRF 토큰이 필요 없다 (세션 쿠키를 쓰면 켠다)
             csrf { disable() }
         }
         return http.build()
@@ -138,13 +139,14 @@ mockMvc.put("/api/items/1") {
 
 ## 프론트
 
-지금 구조(브라우저 -> Next.js 서버 -> 백엔드)를 그대로 쓴다.
+프론트는 정적 파일(CSR)이고 브라우저가 같은 오리진의 `/api`를 부른다 (nginx가 백엔드로 넘긴다). 그래서 로그인과 세션은 백엔드가 맡는다.
 
-- 로그인은 Next.js 서버에서 처리한다 (Auth.js 같은 라이브러리. Next.js 16 지원 여부를 확인하고 고른다)
-- 세션은 httpOnly 쿠키에 두고, access token은 서버에서만 읽는다
-- `src/lib/api/client.ts`의 `request()`가 서버에서 `Authorization: Bearer <token>` 헤더를 붙인다. 기능별 API 함수는 바꾸지 않는다
-- 토큰이나 OIDC client secret을 `NEXT_PUBLIC_` 환경변수나 클라이언트 컴포넌트 props로 넘기지 않는다
-- 백엔드가 401을 주면 로그인 화면으로 보내고, 403은 화면에 오류로 보여 준다 (예상 가능한 오류라 Server Action은 throw하지 않고 상태로 반환)
+- 백엔드가 OIDC 로그인을 처리한다 (`spring-boot-starter-security-oauth2-client`, `oauth2Login`). 로그인 시작(`/oauth2/authorization/...`), 콜백(`/login/oauth2/code/...`), 로그아웃 경로도 nginx가 백엔드로 넘기게 `frontend/nginx/default.conf.template`에 추가한다
+- 세션은 백엔드가 주는 httpOnly, `Secure`, `SameSite=Lax` 쿠키에 둔다. access token, refresh token, client secret은 백엔드 밖으로 내보내지 않는다. 같은 오리진이라 CORS 설정은 필요 없다
+- 쿠키로 인증하므로 CSRF를 켠다. Spring Security의 SPA용 설정(`CookieCsrfTokenRepository`, 읽을 수 있는 `XSRF-TOKEN` 쿠키)을 쓰고, `src/lib/api/client.ts`의 `request()`가 변경 요청(POST, PUT, DELETE)에 `X-XSRF-TOKEN` 헤더를 붙인다. 기능별 API 함수는 바꾸지 않는다
+- 현재 사용자는 `GET /api/me` 같은 API로 받아 `useQuery`로 쓴다. 화면에서 숨기는 것은 편의일 뿐이고, 권한 검사는 항상 백엔드가 한다
+- 백엔드가 401을 주면 로그인 화면(백엔드의 로그인 시작 경로)으로 보내고, 403은 화면에 오류로 보여 준다 (예상 가능한 오류라 `actions.ts`는 throw하지 않고 상태로 반환)
+- 토큰이나 client secret을 `VITE_` 환경변수나 프론트 코드에 넣지 않는다. 빌드 결과는 누구나 받아 볼 수 있다
 
 ## 인증이 필요 없는 서비스
 
