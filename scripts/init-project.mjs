@@ -5,7 +5,7 @@
 // 하는 일
 //   - 패키지 com.example.template -> --package (src/*/kotlin 폴더 이동 + 코드 치환)
 //   - build.gradle.kts group -> 패키지의 앞부분 (com.acme.shop -> com.acme)
-//   - README 제목, compose 프로젝트 이름, 브라우저 탭 제목(layout.tsx) -> --name
+//   - README 제목, compose 프로젝트 이름, 브라우저 탭 제목(frontend/index.html) -> --name
 //   - CODEOWNERS, LICENSE 소유자 -> --owner (사용자 ID 또는 조직의 팀 org/team)
 // 끝나면 git diff로 확인하고 ./gradlew spotlessApply build 로 검증한다.
 import { execFileSync } from "node:child_process";
@@ -16,7 +16,7 @@ import { parseArgs } from "node:util";
 
 const OLD_PACKAGE = "com.example.template";
 const OLD_GROUP = "com.example";
-const OLD_NAME = "hexagonal-kotlin-next-template";
+const OLD_NAME = "hexagonal-kotlin-react-template";
 
 const { values } = parseArgs({
   options: {
@@ -71,7 +71,7 @@ function trackedFiles() {
     .filter(Boolean);
 }
 
-const TEXT = /\.(kt|kts|ya?ml|md|json|mjs|ts|tsx|properties|sql|alloy|xml)$|^(CODEOWNERS|LICENSE|Dockerfile)$/;
+const TEXT = /\.(kt|kts|ya?ml|md|json|mjs|ts|tsx|html|properties|sql|alloy|xml)$|^(CODEOWNERS|LICENSE|Dockerfile)$/;
 // 템플릿 저장소에서만 쓰는 파일. 새 프로젝트에서는 의미가 없어서 지운다(4번).
 // template-init 워크플로는 이전 이름을 검사 패턴으로 갖고 있어, 치환하면 새 프로젝트에서 검사가 깨진다
 const TEMPLATE_ONLY = [".github/workflows/template-init.yml"];
@@ -146,7 +146,7 @@ for (const file of trackedFiles()) {
     const holder = values.owner.split("/")[0];
     replacements.push(["Copyright (c) 2026 klmin", `Copyright (c) ${new Date().getFullYear()} ${holder}`]);
   }
-  if (file === "frontend/src/app/layout.tsx") replacements.push(['title: "Hexagonal Template"', `title: "${values.name}"`]);
+  if (file === "frontend/index.html") replacements.push(["<title>Hexagonal Template</title>", `<title>${values.name}</title>`]);
   rewrite(file, replacements);
 }
 
