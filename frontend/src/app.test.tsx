@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { onlineManager } from "@tanstack/react-query";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -59,6 +60,41 @@ describe("App 경로", () => {
     renderWithQuery(<App />, { route: "/items/3/edit", queryClient });
 
     expect(await screen.findByLabelText("이름")).toHaveValue("새 이름");
+  });
+
+  it("오프라인이면 캐시 값으로 폼을 열지 않고, 연결되면 최신 값으로 연다", async () => {
+    const queryClient = newQueryClient();
+    queryClient.setQueryData(itemKeys.detail(3), {
+      id: 3,
+      name: "예전 이름",
+      description: null,
+      createdAt: "2026-11-25T00:00:00Z",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () =>
+        Response.json({
+          id: 3,
+          name: "새 이름",
+          description: null,
+          createdAt: "2026-11-25T00:00:00Z",
+        }),
+      ),
+    );
+    // 오프라인이면 TanStack Query 가 요청을 멈춰 둔다 (isFetching 은 false)
+    act(() => onlineManager.setOnline(false));
+    try {
+      renderWithQuery(<App />, { route: "/items/3/edit", queryClient });
+
+      expect(await screen.findByText("불러오는 중...")).toBeInTheDocument();
+      expect(screen.queryByLabelText("이름")).toBeNull();
+
+      act(() => onlineManager.setOnline(true));
+
+      expect(await screen.findByLabelText("이름")).toHaveValue("새 이름");
+    } finally {
+      act(() => onlineManager.setOnline(true));
+    }
   });
 
   it("수정 화면에서 취소하면 목록으로 간다", async () => {

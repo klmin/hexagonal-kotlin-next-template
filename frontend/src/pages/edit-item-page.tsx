@@ -20,9 +20,11 @@ export function EditItemPage() {
 }
 
 function EditItem({ id }: { id: number }) {
-  // 폼은 처음 받은 값으로만 채워진다(defaultValue). 캐시에 남은 예전 값으로 시작하지 않게 서버에서 다시 받을 때까지 기다리고,
+  // 폼은 처음 받은 값으로만 채워진다(defaultValue). 그래서 화면을 연 뒤 서버에서 한 번 받기 전에는
+  // (오프라인이라 요청이 멈춘 경우 포함) 캐시에 남은 예전 값으로 폼을 보여 주지 않는다.
+  // 한 번 보여 준 뒤에는 다시 불러오더라도 폼을 그대로 둬서 입력이 사라지지 않게 하고,
   // 입력하는 동안에는 창 포커스, 재연결로 다시 불러오지 않는다
-  const { data, isFetching, error } = useQuery({
+  const { data, error, isFetchedAfterMount } = useQuery({
     queryKey: itemKeys.detail(id),
     queryFn: ({ signal }) => getItem(id, signal),
     refetchOnMount: "always",
@@ -30,7 +32,7 @@ function EditItem({ id }: { id: number }) {
     refetchOnReconnect: false,
   });
 
-  if (isFetching || (!data && !error)) {
+  if (!isFetchedAfterMount || (!data && !error)) {
     return (
       <p role="status" className="text-sm text-muted-foreground">
         불러오는 중...
