@@ -1,18 +1,36 @@
-"use client";
-
+import { useQueryClient } from "@tanstack/react-query";
 import { useActionState, useId } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { itemKeys } from "@/lib/api/items";
 
-import { createItemAction, type CreateItemState } from "./actions";
+import { submitCreateItem, type ItemFormState } from "./actions";
 
-const initialState: CreateItemState = {};
+const initialState: ItemFormState = {};
 
 export function CreateItemForm() {
-  const [state, formAction, pending] = useActionState(createItemAction, initialState);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [state, formAction, pending] = useActionState(
+    async (_prev: ItemFormState, formData: FormData) => {
+      const result = await submitCreateItem(formData);
+      if (result.ok) {
+        await queryClient.invalidateQueries({ queryKey: itemKeys.all });
+        // 새 항목은 최신순 첫 페이지에 나온다. 다음 페이지(?cursor=)를 보고 있었으면 첫 페이지로 돌아가야 보인다
+        if (searchParams.has("cursor")) {
+          navigate("/");
+        }
+      }
+      return result;
+    },
+    initialState,
+  );
   const id = useId();
   const errorId = `${id}-error`;
 

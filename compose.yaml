@@ -4,7 +4,7 @@
 #   (cd backend && ./gradlew bootJar)
 #   docker compose up -d --build --wait
 #
-# http://localhost:3000 (frontend), http://localhost:8080 (backend)
+# http://localhost:3000 (frontend: nginx 가 정적 파일을 서빙하고 /api 를 backend 로 넘긴다), http://localhost:8080 (backend)
 name: template-app
 
 services:
@@ -41,6 +41,7 @@ services:
   frontend:
     build: ./frontend
     environment:
+      # nginx 가 /api 를 넘길 주소 (브라우저에는 드러나지 않음)
       BACKEND_URL: http://backend:8080
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

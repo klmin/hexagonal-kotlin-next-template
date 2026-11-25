@@ -16,11 +16,13 @@ updates:
     schedule:
       interval: weekly
     groups:
-      next-react:
-        patterns: ['next', 'eslint-config-next', 'react', 'react-dom', '@types/react*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react*', 'react-router']
+      vite:
+        patterns: ['vite', 'vitest', '@vitejs/*', '@tailwindcss/vite']
       others:
         patterns: ['*']
-        exclude-patterns: ['next', 'eslint-config-next', 'react', 'react-dom', '@types/react*']
+        exclude-patterns: ['react', 'react-dom', '@types/react*', 'react-router', 'vite', 'vitest', '@vitejs/*', '@tailwindcss/vite']
     ignore:
       # openapi-typescript(7.x)가 peer로 typescript ^5만 받아서 7로 올리면 npm ci가 실패한다.
       # openapi-typescript가 7을 지원하면 지운다.
@@ -32,7 +34,7 @@ updates:
     schedule:
       interval: weekly
 
-  # Dockerfile, compose 이미지 태그 (postgres, eclipse-temurin, node, 모니터링 스택)
+  # Dockerfile, compose 이미지 태그 (postgres, eclipse-temurin, node, nginx, 모니터링 스택)
   - package-ecosystem: docker
     directories: ['/backend', '/frontend']
     schedule:

@@ -1,28 +1,30 @@
-import Link from "next/link";
-import { unstable_rethrow } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
-import { isCursor, listItems, type ItemPage } from "@/lib/api/items";
-import { logError } from "@/lib/log";
+import { isCursor, itemKeys, listItems } from "@/lib/api/items";
 
 import { DeleteItemButton } from "./delete-item-button";
 
-// cacheComponents 환경이라 <Suspense> 안에서 렌더링해야 함
-export async function ItemList({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const { cursor } = await searchParams;
+export function ItemList() {
+  const [searchParams] = useSearchParams();
+  const cursor = searchParams.get("cursor");
   const current = isCursor(cursor) ? cursor : undefined;
 
-  let page: ItemPage;
-  try {
-    page = await listItems(current);
-  } catch (err) {
-    // try 안에서 notFound(), redirect() 등을 쓰면 Next.js 가 처리하게 다시 던진다
-    unstable_rethrow(err);
-    logError("ItemList failed", err);
+  const { data, isPending, isError } = useQuery({
+    queryKey: itemKeys.list(current),
+    queryFn: ({ signal }) => listItems(current, signal),
+  });
+
+  if (isPending) {
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        불러오는 중...
+      </p>
+    );
+  }
+
+  if (isError) {
     return (
       <p className="text-sm text-destructive">
         목록을 불러오지 못했습니다. 백엔드가 실행 중인지 확인해 주세요.
@@ -30,7 +32,7 @@ export async function ItemList({
     );
   }
 
-  const { items, nextCursor } = page;
+  const { items, nextCursor } = data;
 
   if (items.length === 0) {
     return (
@@ -56,7 +58,7 @@ export async function ItemList({
             </div>
             <div className="flex shrink-0 items-start gap-1">
               <Button variant="ghost" size="sm" asChild>
-                <Link href={`/items/${item.id}/edit`}>수정</Link>
+                <Link to={`/items/${item.id}/edit`}>수정</Link>
               </Button>
               <DeleteItemButton id={item.id} name={item.name} />
             </div>
@@ -83,12 +85,12 @@ function PageLinks({
     <nav aria-label="페이지" className="flex gap-2">
       {!isFirstPage && (
         <Button variant="outline" size="sm" asChild>
-          <Link href="/">처음으로</Link>
+          <Link to="/">처음으로</Link>
         </Button>
       )}
       {nextCursor && (
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/?${new URLSearchParams({ cursor: nextCursor })}`}>다음</Link>
+          <Link to={`/?${new URLSearchParams({ cursor: nextCursor })}`}>다음</Link>
         </Button>
       )}
     </nav>

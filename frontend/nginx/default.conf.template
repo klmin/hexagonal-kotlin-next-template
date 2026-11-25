@@ -1,0 +1,43 @@
+# 정적 파일(dist/) 서빙 + /api 를 백엔드로 넘긴다.
+# nginx 이미지가 시작할 때 ${BACKEND_URL} 같은 환경변수를 채워 /etc/nginx/conf.d/default.conf 로 만든다
+server {
+    listen 3000;
+    server_name _;
+    server_tokens off;
+
+    root /usr/share/nginx/html;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    # 백엔드 주소를 시작할 때 한 번이 아니라 요청 때 조회한다. 그래야 백엔드가 아직 없어도 nginx 가 뜨고,
+    # 백엔드가 재시작해서 IP 가 바뀌어도 따라간다. NGINX_LOCAL_RESOLVERS 는 이미지가 /etc/resolv.conf 에서 채운다.
+    # nginx resolver 는 검색 도메인을 쓰지 않으므로 k8s 에서는 BACKEND_URL 에 FQDN(backend.<ns>.svc.cluster.local)을 쓴다
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+    set $backend_url ${BACKEND_URL};
+
+    # 브라우저는 같은 오리진의 /api 만 부른다. 백엔드 주소는 밖으로 드러나지 않는다.
+    # BACKEND_URL 은 경로 없이 http://host:port 로 쓴다. 요청 경로(/api/...)는 그대로 넘어간다
+    location /api/ {
+        proxy_pass $backend_url;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+
+    # 파일 이름에 해시가 붙은 빌드 결과(vite build)는 오래 캐시한다. 없는 파일은 index.html 대신 404
+    location /assets/ {
+        expires max;
+        try_files $uri =404;
+    }
+
+    # SPA: 파일이 없는 경로(/items/1/edit 등)는 모두 index.html 을 돌려주고 화면은 React Router 가 고른다.
+    # 그래서 없는 화면 경로도 HTTP 200 이고, "찾을 수 없음"은 화면으로 보여 준다.
+    # index.html 은 배포 후 바로 바뀌도록 매번 확인한다
+    location / {
+        expires -1;
+        try_files $uri /index.html;
+    }
+}
