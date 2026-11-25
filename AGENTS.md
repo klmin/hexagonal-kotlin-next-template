@@ -10,7 +10,7 @@
 - `docs/configuration.md` - 설정값 목록. 환경변수를 추가하거나 바꾸면 이 문서와 해당 `.env.example`도 같이 고친다
 - `docs/authentication.md` - 인증을 붙일 때 무엇을 어디에 두는지 (템플릿에는 인증 코드 없음)
 - `infra/observability/` - 로컬 모니터링 스택 ([README](infra/observability/README.md))
-- `frontend/` - Next.js 16 (App Router, Cache Components), React 19, TypeScript, Tailwind 4, shadcn/ui ([README](frontend/README.md), [AGENTS](frontend/AGENTS.md))
+- `frontend/` - React 19 + Vite (SPA, CSR), React Router, TanStack Query, TypeScript, Tailwind 4, shadcn/ui ([README](frontend/README.md))
 
 ## 명령
 
@@ -87,14 +87,15 @@ common/jooq/                         jOOQ 생성 코드 (빌드 시 생성, 커�
 
 ## 프론트엔드
 
-- Next.js 16은 이전 버전과 API가 다르다. 코드 쓰기 전에 `frontend/node_modules/next/dist/docs/`에서 해당 문서를 확인한다
-- 백엔드 호출은 서버에서만. `src/lib/api/client.ts`의 `request()`를 쓰고 기능별 파일(`items.ts` 등)에 함수를 둔다. `import "server-only"` 필수
-- 서버 환경변수는 `src/lib/env.ts`(zod)에 추가하고 `serverEnv()`로 읽는다
-- 캐시하지 않는 데이터를 읽는 서버 컴포넌트는 `<Suspense>` 안에 둔다 (아니면 `next build` 실패)
+- React + Vite SPA(CSR)다. `vite build`가 정적 파일(`dist/`)을 만들고, 운영에서는 nginx(`frontend/nginx/`)가 서빙하면서 `/api`를 백엔드로 넘긴다. 개발 서버는 `vite.config.ts`의 `server.proxy`가 같은 일을 한다
+- 화면 경로는 React Router(`src/app.tsx`의 `<Routes>`). 화면은 `src/pages/`, 기능별 컴포넌트와 폼 처리는 `src/features/<기능>/`
+- 백엔드 호출은 같은 오리진의 `/api/...`로만. `src/lib/api/client.ts`의 `request()`를 쓰고 기능별 파일(`items.ts` 등)에 함수를 둔다. 백엔드 주소를 브라우저 코드에 넣지 않는다
+- 조회는 TanStack Query `useQuery`, 키는 기능별로 모아 둔다(`itemKeys`). URL에서 받은 id, 커서는 검증한 뒤 쓴다(`parseItemId`, `isCursor`)
+- 변경은 `features/<기능>/actions.ts`의 함수 + `useActionState`. 성공하면 `queryClient.invalidateQueries`로 다시 불러온다. 예상 가능한 오류는 throw 말고 상태로 반환
+- 브라우저 코드에서 읽는 환경변수는 `VITE_` 접두사가 필요하고 빌드에 그대로 들어간다. 비밀값은 넣지 않는다
 - UI는 `src/components/ui/`의 shadcn/ui 컴포넌트를 쓴다. 추가는 `npx shadcn@latest add <이름>`. 색은 테마 토큰(`text-muted-foreground` 등)
-- 변경은 Server Action + `useActionState`. 성공하면 `refresh()`(`next/cache`). 예상 가능한 오류는 throw 말고 상태로 반환
-- `next lint`는 없다. `npm run lint` 사용. 포맷은 Prettier(`npm run format`)
-- 테스트는 Vitest(`npm test`), 대상 파일 옆에 `*.test.ts(x)`. async 서버 컴포넌트와 화면 흐름은 Playwright(`e2e/`)로 확인
+- 린트는 `npm run lint`(ESLint), 포맷은 Prettier(`npm run format`)
+- 테스트는 Vitest(`npm test`), 대상 파일 옆에 `*.test.ts(x)`. 화면 컴포넌트는 `src/test/render.tsx`의 `renderWithQuery`로 그린다. 화면 흐름은 Playwright(`e2e/`)로 확인
 - E2E는 루트 `compose.yaml`로 전체 스택을 띄우고 `npm run test:e2e`. 데이터가 쌓이므로 테스트마다 고유한 값을 쓴다
 - 백엔드 API 타입은 `src/lib/api/schema.d.ts`(생성 파일)에서 가져온다. 직접 고치지 않는다
 
@@ -118,6 +119,6 @@ PR 리뷰 시 아래를 우선 본다. 스타일, 취향 문제는 지적하지 
 - 트랜잭션 경계 누락이나 잘못된 위치
 - 머지된 Flyway 마이그레이션 수정, 엔티티와 스키마 불일치
 - 입력 검증 누락, Problem Details가 아닌 오류 응답
-- 프론트에서 백엔드를 브라우저로 직접 호출하거나 서버 전용 값을 `NEXT_PUBLIC_`으로 노출
+- 프론트에서 `/api`(같은 오리진)가 아닌 백엔드 주소를 직접 호출하거나, 비밀값을 프론트 코드나 `VITE_` 변수에 넣음 (정적 파일은 누구나 받아 볼 수 있다)
 - 새 기능에 테스트 없음
 - 비밀값(키, 비밀번호, 토큰) 커밋

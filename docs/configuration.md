@@ -49,10 +49,11 @@ Spring이 `backend/.env`를 properties 파일로 읽는다 (`application.yml`의
 
 | 변수 | 기본값 | 로컬 | 운영 | 설명 |
 |---|---|---|---|---|
-| `BACKEND_URL` | http://localhost:8080 | 백엔드 포트가 다를 때만 | **필수** | 서버에서만 쓴다 (브라우저로 노출 안 됨). http/https 형식이어야 기동된다. 요청 시점에 읽으므로 이미지를 다시 빌드할 필요 없음 |
-| `PORT` | 3000 | - | 선택 | Docker 이미지의 Next.js 서버 포트 |
+| `DEV_BACKEND_URL` | http://localhost:8080 | 백엔드 포트가 다를 때만 (`.env.local`) | - | 개발 서버(`npm run dev`), `vite preview`가 `/api`를 넘길 주소. `vite.config.ts`에서만 읽는다 |
+| `BACKEND_URL` | http://backend:8080 | - | **필수** | Docker 이미지(nginx)가 `/api`를 넘길 주소. 경로 없이 `http://host:port`. k8s에서는 FQDN(`backend.<ns>.svc.cluster.local`). 컨테이너 시작 때 읽으므로 이미지를 다시 빌드할 필요 없음 |
 
-새 변수는 `frontend/src/lib/env.ts`의 스키마에 추가한다. 브라우저에서 써야 하는 값만 `NEXT_PUBLIC_` 접두사를 붙이고, 이 값은 빌드할 때 고정된다.
+프론트는 정적 파일이라 브라우저 코드에서 읽는 값(`VITE_` 접두사)은 빌드할 때 고정된다. 누구나 볼 수 있으므로 비밀값은 넣지 않는다.
+Docker 이미지는 3000 포트로 연다(`frontend/nginx/default.conf.template`).
 
 ## 루트 compose.yaml (전체 스택 로컬 확인, E2E)
 
@@ -75,7 +76,7 @@ Spring이 `backend/.env`를 properties 파일로 읽는다 (`application.yml`의
 |---|---|---|
 | 로컬 (`bootRun`, `npm run dev`) | 없음 | 없음 |
 | 루트 compose | compose가 넣어 줌 (`.env`로 포트, DB 계정만 변경) | compose가 넣어 줌 |
-| 운영 | `SPRING_DATASOURCE_*`, `API_DOCS_ENABLED=false`, `APP_ENV` (+ 모니터링 쓰면 `OTLP_*`, `LOG_CONSOLE_FORMAT=logstash`) | `BACKEND_URL` |
+| 운영 | `SPRING_DATASOURCE_*`, `API_DOCS_ENABLED=false`, `APP_ENV` (+ 모니터링 쓰면 `OTLP_*`, `LOG_CONSOLE_FORMAT=logstash`) | `BACKEND_URL` (nginx 이미지) |
 
 ### 로그는 어떻게 남나
 

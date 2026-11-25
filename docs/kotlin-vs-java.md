@@ -1,6 +1,6 @@
 # 자바 버전과 다른 점
 
-이 저장소는 [hexagonal-java-next-template](https://github.com/klmin/hexagonal-java-next-template)의 백엔드를 코틀린으로 옮긴 것이다.
+이 저장소는 [hexagonal-java-react-template](https://github.com/klmin/hexagonal-java-react-template)의 백엔드를 코틀린으로 옮긴 것이다.
 패키지 구조, API(`openapi/openapi.json`), 프론트, 인프라, ArchUnit 규칙은 같다. 같은 E2E 테스트가 두 백엔드에서 모두 통과한다.
 
 두 저장소의 같은 파일을 나란히 열어 보면서 읽는 것을 추천한다. 코드 주석에도 "자바에서는 이렇게, 코틀린에서는 이래서 이렇게"를 적어 두었다.
